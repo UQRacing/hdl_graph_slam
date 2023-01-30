@@ -50,6 +50,11 @@ public:
       msf_pose_after_update_sub = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/msf_core/pose_after_update", 1, boost::bind(&ScanMatchingOdometryNodelet::msf_pose_callback, this, _1, true));
     }
 
+    if (!nh.hasParam("fixed_covariance")) {
+      ROS_WARN("Unable to find fixed_covariance! robot_localization will not work");
+    }
+    fixedCovariance = nh.param<double>("fixed_covariance", 1.0);
+
     points_sub = nh.subscribe("/filtered_points", 256, &ScanMatchingOdometryNodelet::cloud_callback, this);
     read_until_pub = nh.advertise<std_msgs::Header>("/scan_matching_odometry/read_until", 32);
     odom_pub = nh.advertise<nav_msgs::Odometry>("/odom", 32);
@@ -59,6 +64,8 @@ public:
   }
 
 private:
+  double fixedCovariance;
+
   /**
    * @brief initialize parameters
    */
@@ -287,6 +294,13 @@ private:
     odom.twist.twist.linear.x = 0.0;
     odom.twist.twist.linear.y = 0.0;
     odom.twist.twist.angular.z = 0.0;
+
+    // BEGIN UQRacing(Matt): Insert fixed covariances
+    odom.pose.covariance.fill(0.0);
+    for (int i = 0; i < 6; i++) {
+      odom.pose.covariance[i * 6 + i] = fixedCovariance;
+    }
+    // END UQRacing(Matt)
 
     odom_pub.publish(odom);
   }
